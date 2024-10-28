@@ -1,19 +1,32 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+// Helper function to generate unique client IDs
+const generateUniqueId = (): string => {
+  return crypto.randomUUID();
+};
+
+type WebSocketMessage = {
+  action: string;
+  data?: any;
+  senderClientId?: string;
+  targetClientId?: string;
+  clients?: string[];
+  roomId?: string;
+  clientId?: string;
+};
 
 export default function ChatPage() {
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-
   const [isCallActive, setIsCallActive] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [email, setEmail] = useState("");
   const [searchedUser, setSearchedUser] = useState<{ email: string } | null>(
     null
-  ); // Mock user search result
+  ); 
+  
+  // Mock user search result
   const [isUserFound, setIsUserFound] = useState(false);
 
   const handleSearchEmail = () => {
-    // Mock search logic - Replace this with a real search API call or logic
+    // Mock search logic
     if (email === "user@example.com") {
       setSearchedUser({ email });
       setIsUserFound(true);
@@ -36,15 +49,264 @@ export default function ChatPage() {
     console.log("Call ended");
   };
 
-  const toggleMute = () => {
-    setIsMuted((prev) => !prev);
-    // Logic to mute/unmute the audio stream goes here
-    console.log(isMuted ? "Unmuting" : "Muting");
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<{
+    [key: string]: MediaStream;
+  }>({});
+  const [isSocketOpen, setIsSocketOpen] = useState(false);
+  const clientId = generateUniqueId();
+  const roomId = "5"; // Static room ID, can be dynamically generated if needed
+  const peerConnections: { [key: string]: RTCPeerConnection } = {}; // Peer connections
+  let localStream: MediaStream | null = null;
+  let socket: WebSocket | null = null;
+  const messageQueue: string[] = [];
+
+  const peerConnectionConfig: RTCConfiguration = {
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  };
+
+  useEffect(() => {
+    if (isCallActive) {
+      initializeWebSocket();
+
+      return () => {
+        if (socket) socket.close();
+        Object.values(peerConnections).forEach((pc) => pc.close());
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }
+  }, [isCallActive]);
+
+  // Initialize WebSocket connection
+  const initializeWebSocket = () => {
+    socket = new WebSocket(
+      "wss://x6mfeq38bg.execute-api.us-east-1.amazonaws.com/production/"
+    );
+
+    socket.onopen = () => {
+      console.log("WebSocket connection opened");
+      setIsSocketOpen(true);
+
+      sendMessage({
+        action: "join",
+        roomId: roomId,
+        clientId: clientId,
+      });
+
+      // Send queued messages
+      while (messageQueue.length > 0) {
+        if (socket) {
+          socket.send(messageQueue.shift()!);
+        }
+      }
+    };
+
+    socket.onmessage = async (message) => {
+      console.log("Received message:", message.data);
+      let msg: WebSocketMessage;
+      try {
+        msg = JSON.parse(message.data);
+      } catch (e) {
+        console.error("Failed to parse message as JSON:", message.data);
+        return;
+      }
+
+      const { action, data, senderClientId } = msg;
+
+      if (senderClientId === clientId) return; // Ignore own messages
+
+      switch (action) {
+        case "joined":
+          console.log("Joined room. Clients in room:", msg.clients);
+          await ensureLocalStream();
+          msg.clients?.forEach(async (existingClientId) => {
+            if (existingClientId !== clientId) {
+              await initializePeerConnection(existingClientId, true);
+            }
+          });
+          break;
+        case "new-peer":
+          console.log("New peer joined:", senderClientId);
+          await initializePeerConnection(senderClientId!, false);
+          break;
+        case "offer":
+          await handleOffer(data as RTCSessionDescriptionInit, senderClientId!);
+          break;
+        case "answer":
+          await handleAnswer(
+            data as RTCSessionDescriptionInit,
+            senderClientId!
+          );
+          break;
+        case "candidate":
+          await handleCandidate(data as RTCIceCandidateInit, senderClientId!);
+          break;
+        default:
+          console.warn("Unknown action:", action);
+          break;
+      }
+    };
+
+    socket.onerror = (error) => console.error("WebSocket error:", error);
+
+    socket.onclose = () => {
+      console.log("WebSocket connection closed");
+      setIsSocketOpen(false);
+    };
+  };
+
+  // Ensure local stream is captured
+  const ensureLocalStream = async (): Promise<void> => {
+    if (!localStream) {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+        }
+        console.log("Local stream obtained");
+      } catch (error) {
+        console.error("Error accessing media devices.", error);
+      }
+    }
+  };
+
+  const initializePeerConnection = async (
+    remoteClientId: string,
+    isInitiator: boolean
+  ) => {
+    await ensureLocalStream();
+
+    const pc = new RTCPeerConnection(peerConnectionConfig);
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log("Sending ICE candidate to:", remoteClientId);
+        sendMessage({
+          action: "candidate",
+          data: event.candidate,
+          roomId: roomId,
+          clientId: clientId,
+          targetClientId: remoteClientId,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      console.log("Received remote track from:", remoteClientId);
+      setRemoteStreams((prevStreams) => ({
+        ...prevStreams,
+        [remoteClientId]: event.streams[0],
+      }));
+    };
+
+    localStream
+      ?.getTracks()
+      .forEach((track) => pc.addTrack(track, localStream!));
+
+    peerConnections[remoteClientId] = pc;
+
+    if (isInitiator) {
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        console.log(
+          "Created and set local description for offer to:",
+          remoteClientId
+        );
+
+        sendMessage({
+          action: "offer",
+          data: offer,
+          roomId: roomId,
+          clientId: clientId,
+          targetClientId: remoteClientId,
+        });
+      } catch (error) {
+        console.error("Error creating offer:", error);
+      }
+    }
+  };
+
+  const handleOffer = async (
+    offer: RTCSessionDescriptionInit,
+    senderClientId: string
+  ) => {
+    const pc = peerConnections[senderClientId];
+    if (pc) {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        console.log("Set remote description for offer from:", senderClientId);
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        console.log(
+          "Created and set local description for answer to:",
+          senderClientId
+        );
+
+        sendMessage({
+          action: "answer",
+          data: answer,
+          roomId: roomId,
+          clientId: clientId,
+          targetClientId: senderClientId,
+        });
+      } catch (error) {
+        console.error("Error handling offer from:", senderClientId, error);
+      }
+    }
+  };
+
+  const handleAnswer = async (
+    answer: RTCSessionDescriptionInit,
+    senderClientId: string
+  ) => {
+    const pc = peerConnections[senderClientId];
+    if (pc) {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        console.log("Set remote description for answer from:", senderClientId);
+      } catch (error) {
+        console.error("Error handling answer from:", senderClientId, error);
+      }
+    }
+  };
+
+  const handleCandidate = async (
+    candidate: RTCIceCandidateInit,
+    senderClientId: string
+  ) => {
+    const pc = peerConnections[senderClientId];
+    if (pc) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log("Added ICE candidate from:", senderClientId);
+      } catch (error) {
+        console.error(
+          "Error adding ICE candidate from:",
+          senderClientId,
+          error
+        );
+      }
+    }
+  };
+
+  const sendMessage = (message: WebSocketMessage) => {
+    const fullMessage = { ...message, clientId };
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(fullMessage));
+    } else {
+      console.log("Queueing message:", fullMessage);
+      messageQueue.push(JSON.stringify(fullMessage));
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-      <div className="w-full max-w-5xl p-4">
+      <div className="w-[80%] p-5">
         <h1 className="text-3xl font-bold text-center mb-4">
           Video/Audio Chat
         </h1>
@@ -84,7 +346,7 @@ export default function ChatPage() {
         )}
 
         {/* Video Containers */}
-        <div className="flex space-x-4 justify-center items-center">
+        <div className="flex md:flex-row flex-col space-x-4 justify-center items-center">
           {/* Local Video */}
           <div className="w-1/2">
             <h2 className="text-lg text-center mb-2">Your Video</h2>
@@ -99,13 +361,26 @@ export default function ChatPage() {
 
           {/* Remote Video */}
           <div className="w-1/2">
-            <h2 className="text-lg text-center mb-2">Remote Video</h2>
-            <video
-              ref={remoteVideoRef}
-              className="w-full h-64 bg-gray-800 rounded-md"
-              autoPlay
-              playsInline
-            />
+            {Object.keys(remoteStreams).map((clientId) => {
+              const stream = remoteStreams[clientId];
+              return stream?.active ? ( // Only render if the stream is active
+                <div key={clientId}>
+                  <h2 className="text-lg text-center mb-2">
+                    Remote Video from {clientId}
+                  </h2>
+                  <video
+                    ref={(video) => {
+                      if (video && stream) {
+                        video.srcObject = stream;
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    className="w-full h-64 bg-gray-800 rounded-md"
+                  />
+                </div>
+              ) : null; // If the stream is inactive, render nothing
+            })}
           </div>
         </div>
 
@@ -134,14 +409,6 @@ export default function ChatPage() {
                 className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
               >
                 End Call
-              </button>
-              <button
-                onClick={toggleMute}
-                className={`${
-                  isMuted ? "bg-gray-500" : "bg-blue-500"
-                } text-white px-4 py-2 rounded-md hover:bg-blue-600`}
-              >
-                {isMuted ? "Unmute" : "Mute"}
               </button>
             </>
           )}

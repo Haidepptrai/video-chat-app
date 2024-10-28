@@ -17,7 +17,6 @@ const registerSchema = z
 type RegisterFormInputs = z.infer<typeof registerSchema>;
 
 export default function Register() {
-  // Use useForm with Zod validation
   const {
     register,
     handleSubmit,

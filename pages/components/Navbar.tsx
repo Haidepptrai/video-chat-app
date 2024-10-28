@@ -1,4 +1,4 @@
-import { signIn, signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 const Navbar = () => {
@@ -39,20 +39,19 @@ const Navbar = () => {
                 <span className="mr-4">
                   Hello, {session.user?.name || "User"}
                 </span>
-                <button
-                  onClick={() => signOut()}
-                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Logout
+                <button className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium">
+                  <Link href="/auth/logout">Logout</Link>
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => signIn()}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Login
-              </button>
+              <>
+                <button className="mr-4 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium">
+                  <Link href="/auth/sign-up">Sign Up</Link>
+                </button>
+                <button className=" bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium">
+                  <Link href="/auth/login">Login</Link>
+                </button>
+              </>
             )}
           </div>
         </div>
