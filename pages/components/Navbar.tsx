@@ -1,8 +1,25 @@
-import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 
 const Navbar = () => {
-  const { data: session, status } = useSession(); // Get the authentication session
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const userEmail = localStorage.getItem("userEmail");
+
+    if (userEmail) {
+      setUserEmail(userEmail);
+    }
+  }, []);
+
+  const handleLogout = () => {
+    // Clear all local storage
+    localStorage.clear();
+    setUserEmail(null);
+    router.push("/");
+  };
 
   return (
     <nav className="bg-primary text-white">
@@ -32,15 +49,14 @@ const Navbar = () => {
 
           {/* Login / Logout button */}
           <div>
-            {status === "loading" ? (
-              <p>Loading...</p>
-            ) : session ? (
+            {userEmail ? (
               <>
-                <span className="mr-4">
-                  Hello, {session.user?.name || "User"}
-                </span>
-                <button className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium">
-                  <Link href="/auth/logout">Logout</Link>
+                <span className="mr-4">Hello, {userEmail}</span>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Logout
                 </button>
               </>
             ) : (

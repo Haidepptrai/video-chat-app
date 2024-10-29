@@ -1,36 +1,64 @@
-import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 
 export default function SignIn() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-//   const { data: session } = useSession();
   const router = useRouter();
+
+  useEffect(() => {
+    // Retrieve email and password from localStorage on component mount
+    const savedEmail = localStorage.getItem("userEmail");
+    const savedPassword = localStorage.getItem("password");
+
+    if (savedEmail) setEmail(savedEmail);
+    if (savedPassword) setPassword(savedPassword);
+
+    // Clear email and password from localStorage after pre-filling
+    localStorage.removeItem("email");
+    localStorage.removeItem("password");
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); // Clear any previous error
 
-    // Call the NextAuth signIn method
-    // const res = await signIn('credentials', {
-    //   redirect: false,
-    //   username,
-    //   password,
-    // });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    // if (res?.error) {
-    //   setError(res.error); // Set error message
-    // } else {
-    //   router.push('/'); // Redirect to homepage on successful login
-    // }
+      if (response.ok) {
+        const data = await response.json();
+
+        if (typeof window !== "undefined") {
+          // Set the userId in local storage if in the browser
+          localStorage.setItem("userId", data.userId);
+          localStorage.setItem("userEmail", email);
+        }
+
+        // Redirect to the home page on successful login
+        router.push("/");
+      } else {
+        setError("Invalid username or password. Please try again.");
+      }
+    } catch (error) {
+      console.error("An error occurred:", error);
+      setError("An error occurred. Please try again.");
+    }
   };
 
-//   if (session) {
-//     // If user is already logged in, redirect them
-//     router.push('/');
-//     return null;
-//   }
+  // Check if user is already logged in, but only in the browser
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("userId")) {
+      router.push("/");
+    }
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -40,15 +68,17 @@ export default function SignIn() {
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}
 
         <form onSubmit={handleSubmit}>
-          {/* Username Field */}
+          {/* Email Field */}
           <div className="mb-4">
-            <label htmlFor="username" className="block text-gray-700 mb-2">Username</label>
+            <label htmlFor="email" className="block text-gray-700 mb-2">
+              Email
+            </label>
             <input
-              type="text"
-              id="username"
-              name="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              id="email"
+              name="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-blue-500"
               required
             />
@@ -56,7 +86,9 @@ export default function SignIn() {
 
           {/* Password Field */}
           <div className="mb-4">
-            <label htmlFor="password" className="block text-gray-700 mb-2">Password</label>
+            <label htmlFor="password" className="block text-gray-700 mb-2">
+              Password
+            </label>
             <input
               type="password"
               id="password"

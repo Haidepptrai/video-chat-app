@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { useRouter } from "next/router";
 
 const registerSchema = z
   .object({
@@ -26,25 +27,38 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
   });
 
+  const router = useRouter();
+
   const onSubmit = async (data: RegisterFormInputs) => {
+    const bodyData = {
+      username: data.username,
+      email: data.email,
+      password: data.password,
+    };
+
     try {
-      // Simulate an API call
-      const response = await fetch("/api/register", {
+      const response = await fetch("/api/auth/sign-up", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(bodyData),
       });
 
       if (response.ok) {
-        console.log("Registration successful:", data);
-        reset(); // Clear form after successful submission
+        alert("Registration successful");
+
+        // Save email and password to localStorage
+        localStorage.setItem("userEmail", data.email);
+        localStorage.setItem("password", data.password);
+
+        // Redirect to the login page
+        router.push("/auth/login");
       } else {
-        console.error("Registration failed.");
+        alert("Registration failed");
       }
     } catch (error) {
-      console.error("An error occurred:", error);
+      console.error("Failed to register:", error);
     }
   };
 
