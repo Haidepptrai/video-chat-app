@@ -1,11 +1,13 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { useUser } from "../components/UserContext";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { setUserEmail } = useUser();
 
   useEffect(() => {
     // Retrieve email and password from localStorage on component mount
@@ -22,7 +24,7 @@ export default function SignIn() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null); // Clear any previous error
+    setError(null);
 
     try {
       const response = await fetch("/api/auth/login", {
@@ -37,12 +39,11 @@ export default function SignIn() {
         const data = await response.json();
 
         if (typeof window !== "undefined") {
-          // Set the userId in local storage if in the browser
           localStorage.setItem("userId", data.userId);
           localStorage.setItem("userEmail", email);
         }
 
-        // Redirect to the home page on successful login
+        setUserEmail(email); // Set the user email in context
         router.push("/");
       } else {
         setError("Invalid username or password. Please try again.");
@@ -52,6 +53,7 @@ export default function SignIn() {
       setError("An error occurred. Please try again.");
     }
   };
+
 
   // Check if user is already logged in, but only in the browser
   useEffect(() => {

@@ -1,21 +1,12 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useUser } from "./UserContext";
 
 const Navbar = () => {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const { userEmail, setUserEmail } = useUser();
   const router = useRouter();
 
-  useEffect(() => {
-    const userEmail = localStorage.getItem("userEmail");
-
-    if (userEmail) {
-      setUserEmail(userEmail);
-    }
-  }, []);
-
   const handleLogout = () => {
-    // Clear all local storage
     localStorage.clear();
     setUserEmail(null);
     router.push("/");
@@ -30,7 +21,6 @@ const Navbar = () => {
               Video/Audio Chat
             </Link>
 
-            {/* Navigation links */}
             <div className="ml-10 space-x-4">
               <Link
                 className="hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium"
@@ -47,7 +37,6 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Login / Logout button */}
           <div>
             {userEmail ? (
               <>
