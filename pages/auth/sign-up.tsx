@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/router";
+import { useState } from "react";
 
 const registerSchema = z
   .object({
@@ -17,7 +18,7 @@ const registerSchema = z
 
 type RegisterFormInputs = z.infer<typeof registerSchema>;
 
-export default function Register() {
+const Register = () => {
   const {
     register,
     handleSubmit,
@@ -28,6 +29,7 @@ export default function Register() {
   });
 
   const router = useRouter();
+  const [loading, setLoading] = useState(false); // Loading state
 
   const onSubmit = async (data: RegisterFormInputs) => {
     const bodyData = {
@@ -35,6 +37,8 @@ export default function Register() {
       email: data.email,
       password: data.password,
     };
+
+    setLoading(true); // Start loading
 
     try {
       const response = await fetch("/api/auth/sign-up", {
@@ -59,6 +63,8 @@ export default function Register() {
       }
     } catch (error) {
       console.error("Failed to register:", error);
+    } finally {
+      setLoading(false); // Stop loading
     }
   };
 
@@ -152,11 +158,21 @@ export default function Register() {
           <button
             type="submit"
             className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
+            disabled={loading} // Disable button when loading
           >
-            Register
+            {loading ? "Registering..." : "Register"}
           </button>
+
+          {/* Loading Indicator */}
+          {loading && (
+            <div className="flex justify-center mt-4">
+              <span className="text-gray-500">Processing your request...</span>
+            </div>
+          )}
         </form>
       </div>
     </div>
   );
-}
+};
+
+export default Register;

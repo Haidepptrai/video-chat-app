@@ -2,10 +2,11 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { useUser } from "../components/UserContext";
 
-export default function SignIn() {
+const SignIn = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false); // Loading state
   const router = useRouter();
   const { setUserEmail } = useUser();
 
@@ -25,6 +26,7 @@ export default function SignIn() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLoading(true); // Start loading
 
     try {
       const response = await fetch("/api/auth/login", {
@@ -51,9 +53,10 @@ export default function SignIn() {
     } catch (error) {
       console.error("An error occurred:", error);
       setError("An error occurred. Please try again.");
+    } finally {
+      setLoading(false); // Stop loading
     }
   };
-
 
   // Check if user is already logged in, but only in the browser
   useEffect(() => {
@@ -106,11 +109,21 @@ export default function SignIn() {
           <button
             type="submit"
             className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring focus:ring-blue-500"
+            disabled={loading} // Disable button while loading
           >
-            Sign In
+            {loading ? "Signing In..." : "Sign In"}
           </button>
+
+          {/* Loading Indicator */}
+          {loading && (
+            <div className="flex justify-center mt-4">
+              <span className="text-gray-500">Processing your request...</span>
+            </div>
+          )}
         </form>
       </div>
     </div>
   );
-}
+};
+
+export default SignIn;

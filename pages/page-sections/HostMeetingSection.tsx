@@ -23,12 +23,19 @@ const HostMeetingSection: React.FC<HostMeetingSectionProps> = ({
 }) => {
   const [userID, setUserID] = useState<number | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<
-    Record<number, MediaStream>
+    Record<number, { stream: MediaStream; loading: boolean }>
   >({});
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  if (!process.env.NEXT_PUBLIC_ICE_SERVERS_URL) {
+    throw new Error(
+      "ICE_SERVERS_URL is not defined. Please set it in your environment variables."
+    );
+  }
+
   const peerConnectionConfig: RTCConfiguration = {
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    iceServers: [{ urls: process.env.NEXT_PUBLIC_ICE_SERVERS_URL }],
   };
 
   let localStream: MediaStream | null = null;
@@ -57,9 +64,7 @@ const HostMeetingSection: React.FC<HostMeetingSectionProps> = ({
   }, [userID]);
 
   const initializeWebSocket = () => {
-    socket = new WebSocket(
-      "wss://x6mfeq38bg.execute-api.us-east-1.amazonaws.com/production/"
-    );
+    socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}`);
 
     socket.onopen = () => {
       console.log("WebSocket connection opened");
@@ -168,10 +173,16 @@ const HostMeetingSection: React.FC<HostMeetingSectionProps> = ({
       if (event.streams && event.streams[0]) {
         setRemoteStreams((prevStreams) => ({
           ...prevStreams,
-          [remoteUserID]: event.streams[0],
+          [remoteUserID]: { stream: event.streams[0], loading: false },
         }));
       }
     };
+
+    //Set loading state for remote stream
+    setRemoteStreams((prevStreams) => ({
+      ...prevStreams,
+      [remoteUserID]: { stream: new MediaStream(), loading: true },
+    }));
 
     // Detect connection issues and remove disconnected peers
     pc.oniceconnectionstatechange = () => {
@@ -317,12 +328,18 @@ const HostMeetingSection: React.FC<HostMeetingSectionProps> = ({
         />
         <button
           onClick={handleCopy}
-          className="px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-[10rem] px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {isCopied ? "Copied" : "Copy"}
         </button>
       </div>
-      <div className="flex flex-col gap-4">
+      <div
+        className={`grid gap-4 ${
+          Object.keys(remoteStreams).length + 1 === 2
+            ? "grid-cols-2"
+            : "grid-cols-2 md:grid-cols-3"
+        }`}
+      >
         <div className="flex flex-col items-center justify-center">
           {userID && <h3>You</h3>}
           <video
@@ -330,26 +347,36 @@ const HostMeetingSection: React.FC<HostMeetingSectionProps> = ({
             autoPlay
             playsInline
             muted
-            className="w-64 h-48"
+            className="w-full h-64 bg-gray-800 rounded-md"
           />
         </div>
-        <div className="flex gap-4">
-          {Object.keys(remoteStreams).map((remoteID) => (
-            <div className="text-center w-fit" key={remoteID}>
-              <video
-                ref={(video) => {
-                  if (video && remoteStreams[parseInt(remoteID)]) {
-                    video.srcObject = remoteStreams[parseInt(remoteID)];
-                  }
-                }}
-                autoPlay
-                playsInline
-                className="w-64 h-48"
-              />
-              <span>Remote Video from User Id {remoteID}</span>
-            </div>
-          ))}
-        </div>
+        {Object.keys(remoteStreams).map((remoteID) => (
+          <div
+            className="flex flex-col items-center justify-center"
+            key={remoteID}
+          >
+            {remoteStreams[parseInt(remoteID)].loading ? (
+              <div className="w-64 h-48 flex items-center justify-center bg-gray-300 rounded-md">
+                <span>Waiting for User {remoteID}'s video...</span>
+              </div>
+            ) : (
+              <>
+                <span>Remote Video from User Id {remoteID}</span>
+                <video
+                  ref={(video) => {
+                    if (video && remoteStreams[parseInt(remoteID)].stream) {
+                      video.srcObject =
+                        remoteStreams[parseInt(remoteID)].stream;
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  className="w-full h-64 bg-gray-800 rounded-md"
+                />
+              </>
+            )}
+          </div>
+        ))}
       </div>
       <div className="flex justify-end mt-10">
         <button

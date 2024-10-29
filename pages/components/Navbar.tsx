@@ -20,21 +20,6 @@ const Navbar = () => {
             <Link className="text-xl font-bold" href="/">
               Video/Audio Chat
             </Link>
-
-            <div className="ml-10 space-x-4">
-              <Link
-                className="hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-                href="/"
-              >
-                Home
-              </Link>
-              <Link
-                className="hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-                href="/chat"
-              >
-                Chat
-              </Link>
-            </div>
           </div>
 
           <div>
