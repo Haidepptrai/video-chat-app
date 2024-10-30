@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { useUser } from "../components/UserContext";
+import { useUser } from "../../context/UserContext";
 
 const SignIn = () => {
   const [email, setEmail] = useState("");

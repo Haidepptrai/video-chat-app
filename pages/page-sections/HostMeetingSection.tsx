@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 interface Message {
   action: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   roomId: string;
   userID: number;
@@ -86,7 +87,7 @@ const HostMeetingSection: React.FC<HostMeetingSectionProps> = ({
       let msg: Message;
       try {
         msg = JSON.parse(message.data);
-      } catch (e) {
+      } catch  {
         console.error("Failed to parse message as JSON:", message.data);
         return;
       }
@@ -357,7 +358,7 @@ const HostMeetingSection: React.FC<HostMeetingSectionProps> = ({
           >
             {remoteStreams[parseInt(remoteID)].loading ? (
               <div className="w-64 h-48 flex items-center justify-center bg-gray-300 rounded-md">
-                <span>Waiting for User {remoteID}'s video...</span>
+                <span>Waiting for User {remoteID}&apos;s video...</span>
               </div>
             ) : (
               <>
