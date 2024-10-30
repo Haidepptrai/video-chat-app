@@ -8,10 +8,22 @@ export default function ChatPage() {
   const [isJoining, setIsJoining] = useState(false);
 
   const handleCreateRoom = (state: boolean) => {
+    if (localStorage.getItem("userEmail") === null) {
+      // If user is not logged in, redirect to login page
+      window.location.href = "/auth/login";
+      return;
+    }
+
     setIsHosting(state); // Show HostMeetingSection
   };
 
   const handleJoinRoom = (state: boolean) => {
+    if (localStorage.getItem("userEmail") === null) {
+      // If user is not logged in, redirect to login page
+      window.location.href = "/auth/login";
+      return;
+    }
+
     setIsJoining(state); // Show JoinMeetingSection
   };
 
@@ -30,14 +42,14 @@ export default function ChatPage() {
           <div className="flex flex-col items-center">
             <MeetingButton
               label="Create Room"
-              color="bg-blue-500 text-white"
+              color="bg-[#3b82f6] text-white hover:bg-[#2563eb] hover:transition duration-150"
               onClick={() => handleCreateRoom(true)}
             />
 
             <div className="mt-4">
               <MeetingButton
                 label="Join Room"
-                color="bg-green-500 text-white"
+                color="bg-transparent text-[#3b82f6] border border-[#3b82f6] hover:transition duration-500 hover:bg-[#3b82f6] hover:text-white"
                 onClick={() => handleJoinRoom(true)}
               />
             </div>

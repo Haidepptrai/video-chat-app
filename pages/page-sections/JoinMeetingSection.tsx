@@ -322,7 +322,7 @@ const JoinMeetingSection: React.FC<JoinMeetingSectionProps> = ({
         </button>
       </div>
       <div
-        className={`grid gap-4 ${
+        className={`grid gap-4 mt-5 ${
           Object.keys(remoteStreams).length + 1 === 2
             ? "grid-cols-2"
             : "grid-cols-2 md:grid-cols-3"
